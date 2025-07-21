@@ -16,7 +16,7 @@ constexpr int STAT_H   = SCREEN_H - MAP_H;
 
 // UI state
 struct Camera { double angle=45, zoom=1.0; int panX=0, panY=0; };
-struct UIState  { int geneIdx=0; Camera cam; bool inAlign=false; };
+struct UIState  { int geneIdx=0, pathwayIdx=0; Camera cam; bool inAlign=false, inPathway=false; };
 
 // Forward prototypes
 void initConsole();
@@ -24,6 +24,7 @@ void clearScreen();
 void drawMap(const AlignmentMap&, UIState&);
 void drawStats(const AlignmentMap&, UIState&);
 void drawAlignment(AlignmentEditor&, UIState&);
+void drawPathway(const AlignmentMap&, UIState&);
 void handleMainKey(int vk, AlignmentMap&, UIState&);
 void handleAlignKey(int vk, AlignmentEditor&);
 
@@ -50,6 +51,10 @@ std::string readLineFromConsole() {
 int main() {
     // Demo data
     AlignmentMap map = createDemoMap();
+    auto pathways = createDemoPathways();
+    for(const auto& p : pathways) {
+        map.addPathway(p);
+    }
     AlignmentEditor editor;
     editor.loadDemoDNA();
 
@@ -63,12 +68,16 @@ int main() {
         ReadConsoleInput(hIn, &rec, 1, &cnt);
         if (rec.EventType == KEY_EVENT && rec.Event.KeyEvent.bKeyDown) {
             int vk = rec.Event.KeyEvent.wVirtualKeyCode;
-            if (vk==VK_ESCAPE) {
+            if (vk == VK_ESCAPE) {
                 if (st.inAlign) st.inAlign = false;
+                else if (st.inPathway) st.inPathway = false;
                 else break;
             }
-            else if (vk=='A' && !st.inAlign) {
+            else if (vk == 'A' && !st.inAlign && !st.inPathway) {
                 st.inAlign = true;
+            }
+            else if (vk == 'V' && !st.inAlign && !st.inPathway) {
+                st.inPathway = true;
             }
             else if (st.inAlign) {
                 handleAlignKey(vk, editor);
@@ -82,13 +91,15 @@ int main() {
         clearScreen();
         if (st.inAlign) {
             drawAlignment(editor, st);
+        } else if (st.inPathway) {
+            drawPathway(map, st);
         } else {
             drawMap(map, st);
             drawStats(map, st);
             // show mode hint
             COORD p{0, SHORT(SCREEN_H-1)};
             SetConsoleCursorPosition(hOut, p);
-            std::cout << "[A]Align  [L]Load  [N/P]Next/Prev Gene  [←/→/↑/↓]Pan/Rotate/Zoom  [Esc]Quit";
+            std::cout << "[A]Align  [V]Pathway  [L]Load  [N/P]Next/Prev Gene  [←/→/↑/↓]Pan/Rotate/Zoom  [Esc]Quit";
         }
     }
 
@@ -168,7 +179,63 @@ void drawAlignment(AlignmentEditor& editor, UIState& st) {
     editor.render(SCREEN_W, SCREEN_H);
 }
 
+// draw pathway view
+void drawPathway(const AlignmentMap& map, UIState& st) {
+    auto& pathways = map.getPathways();
+    if (pathways.empty()) {
+        std::cout << "No pathways loaded.";
+        return;
+    }
+
+    auto& p = pathways[st.pathwayIdx];
+    COORD pos{0,0};
+    SetConsoleCursorPosition(hOut, pos);
+
+    std::cout << "Pathway: " << p.name << " (" << p.description << ")";
+    pos.Y = 2;
+    SetConsoleCursorPosition(hOut, pos);
+
+    // crude layout
+    std::map<std::string, COORD> genePositions;
+    int y = 5;
+    for(const auto& symbol : p.geneSymbols) {
+        genePositions[symbol] = {10, SHORT(y)};
+        y += 2;
+    }
+
+    for(const auto&- kv : p.interactions) {
+        const auto& from = kv.first;
+        for(const auto& to : kv.second) {
+            COORD p1 = genePositions[from];
+            COORD p2 = genePositions[to];
+
+            // very basic line drawing
+            int x1 = p1.X, y1 = p1.Y;
+            int x2 = p2.X, y2 = p2.Y;
+
+            while(x1 != x2 || y1 != y2) {
+                if (x1 < x2) x1++; else if (x1 > x2) x1--;
+                if (y1 < y2) y1++; else if (y1 > y2) y1--;
+                SetConsoleCursorPosition(hOut, {SHORT(x1), SHORT(y1)});
+                std::cout << ".";
+            }
+        }
+    }
+
+    for(const auto&- kv : genePositions) {
+        SetConsoleCursorPosition(hOut, kv.second);
+        std::cout << "[" << kv.first << "]";
+    }
+}
+
 void handleMainKey(int vk, AlignmentMap& map, UIState& st) {
+    if (st.inPathway) {
+        switch(vk) {
+            case VK_UP:   st.pathwayIdx = (st.pathwayIdx + map.getPathways().size() - 1) % map.getPathways().size(); break;
+            case VK_DOWN: st.pathwayIdx = (st.pathwayIdx + 1) % map.getPathways().size(); break;
+        }
+        return;
+    }
     switch(vk) {
         case VK_LEFT:   st.cam.panX  -= 1; break;
         case VK_RIGHT:  st.cam.panX  += 1; break;

@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <chrono>
+#include <map>
 
 //-----------------------------------------------------------------------------
 // Gene‐map data structures
@@ -26,6 +27,17 @@ struct GenomeStats {
     std::string timestamp;
 };
 
+//-----------------------------------------------------------------------------
+// Pathway data structures
+//-----------------------------------------------------------------------------
+
+struct Pathway {
+    std::string name;
+    std::string description;
+    std::vector<std::string> geneSymbols;
+    std::map<std::string, std::vector<std::string>> interactions;
+};
+
 class AlignmentMap {
 public:
     void addGene(const GeneModel& g);
@@ -34,13 +46,17 @@ public:
     void loadGenesFromCSV(const std::string& filename);
     void loadGenesFromJSON(const std::string& filename);
     void toggleKnockout(const std::string& symbol);
+    void addPathway(const Pathway& p);
+    const std::vector<Pathway>& getPathways() const;
 
 private:
     std::vector<GeneModel> genes_;
+    std::vector<Pathway> pathways_;
     std::string makeTimestamp() const;
 };
 
 AlignmentMap createDemoMap();
+std::vector<Pathway> createDemoPathways();
 
 //-----------------------------------------------------------------------------
 // Sequence‐alignment data structures

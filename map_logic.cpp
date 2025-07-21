@@ -245,8 +245,16 @@ void AlignmentMap::addGene(const GeneModel& g) {
     genes_.push_back(g);
 }
 
+void AlignmentMap::addPathway(const Pathway& p) {
+    pathways_.push_back(p);
+}
+
 const std::vector<GeneModel>& AlignmentMap::getGenes() const {
     return genes_;
+}
+
+const std::vector<Pathway>& AlignmentMap::getPathways() const {
+    return pathways_;
 }
 
 GenomeStats AlignmentMap::calculateStatistics() const {
@@ -289,6 +297,34 @@ AlignmentMap createDemoMap() {
     m.addGene({"DRD2","11",113409000,113475000,6.2,0.72,false});
     m.addGene({"BDNF","11",27650000,27700000,8.1,0.60,false});
     return m;
+}
+
+std::vector<Pathway> createDemoPathways() {
+    std::vector<Pathway> pathways;
+
+    Pathway p1;
+    p1.name = "Neural Plasticity";
+    p1.description = "Pathway involved in learning and memory";
+    p1.geneSymbols = {"BDNF", "CREB1", "GRIN2B", "CAMK2A"};
+    p1.interactions = {
+        {"BDNF", {"CREB1", "CAMK2A"}},
+        {"CREB1", {"GRIN2B"}},
+        {"CAMK2A", {"GRIN2B"}}
+    };
+    pathways.push_back(p1);
+
+    Pathway p2;
+    p2.name = "Caspase-Mediated Apoptosis";
+    p2.description = "Pathway involved in programmed cell death";
+    p2.geneSymbols = {"CASP3", "CASP8", "CASP9", "BCL2"};
+    p2.interactions = {
+        {"CASP8", {"CASP3"}},
+        {"CASP9", {"CASP3"}},
+        {"BCL2", {"CASP9"}}
+    };
+    pathways.push_back(p2);
+
+    return pathways;
 }
 
 //-----------------------------------------------------------------------------
