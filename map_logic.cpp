@@ -49,6 +49,27 @@ void AlignmentMap::loadGenesFromCSV(const std::string& filename) {
             continue;
         }
 
+        if (fields.size() > 4) {
+            std::stringstream ss(fields[4]);
+            std::string tag;
+            while(std::getline(ss, tag, ';')) {
+                g.disorderTags.push_back(tag);
+            }
+        }
+
+        if (fields.size() > 5) {
+            std::stringstream ss(fields[5]);
+            std::string kv;
+            while(std::getline(ss, kv, ';')) {
+                size_t sep = kv.find(':');
+                if (sep != std::string::npos) {
+                    std::string region = kv.substr(0, sep);
+                    double expr = std::stod(kv.substr(sep + 1));
+                    g.brainRegionExpression[region] = expr;
+                }
+            }
+        }
+
         // Set defaults for missing fields
         g.chromosome = "unknown";
         g.start = 0;
@@ -121,6 +142,49 @@ void AlignmentMap::loadGenesFromJSON(const std::string& filename) {
                 try {
                     g.expressionLevel = std::stod(numStr);
                 } catch (...) {}
+            }
+        }
+
+        // disorderTags
+        size_t tagsPos = obj.find("\"disorderTags\":");
+        if (tagsPos != std::string::npos) {
+            size_t start = obj.find('[', tagsPos);
+            size_t end = obj.find(']', start);
+            if (start != std::string::npos && end != std::string::npos) {
+                std::string tagsStr = obj.substr(start + 1, end - start - 1);
+                std::stringstream ss(tagsStr);
+                std::string tag;
+                while(std::getline(ss, tag, ',')) {
+                    size_t quote1 = tag.find('"');
+                    size_t quote2 = tag.find('"', quote1 + 1);
+                    if (quote1 != std::string::npos && quote2 != std::string::npos) {
+                        g.disorderTags.push_back(tag.substr(quote1 + 1, quote2 - quote1 - 1));
+                    }
+                }
+            }
+        }
+
+        // brainRegionExpression
+        size_t brainPos = obj.find("\"brainRegionExpression\":");
+        if (brainPos != std::string::npos) {
+            size_t start = obj.find('{', brainPos);
+            size_t end = obj.find('}', start);
+            if (start != std::string::npos && end != std::string::npos) {
+                std::string brainStr = obj.substr(start + 1, end - start - 1);
+                std::stringstream ss(brainStr);
+                std::string kv;
+                while(std::getline(ss, kv, ',')) {
+                    size_t sep = kv.find(':');
+                    if (sep != std::string::npos) {
+                        size_t quote1 = kv.find('"');
+                        size_t quote2 = kv.find('"', quote1 + 1);
+                        if (quote1 != std::string::npos && quote2 != std::string::npos) {
+                            std::string region = kv.substr(quote1 + 1, quote2 - quote1 - 1);
+                            double expr = std::stod(kv.substr(sep + 1));
+                            g.brainRegionExpression[region] = expr;
+                        }
+                    }
+                }
             }
         }
 
@@ -255,6 +319,14 @@ const std::vector<GeneModel>& AlignmentMap::getGenes() const {
 
 const std::vector<Pathway>& AlignmentMap::getPathways() const {
     return pathways_;
+}
+
+void AlignmentMap::addGeneSet(const GeneSet& gs) {
+    geneSets_.push_back(gs);
+}
+
+const std::vector<GeneSet>& AlignmentMap::getGeneSets() const {
+    return geneSets_;
 }
 
 GenomeStats AlignmentMap::calculateStatistics() const {

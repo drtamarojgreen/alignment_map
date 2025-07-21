@@ -155,22 +155,32 @@ void drawStats(const AlignmentMap& map, UIState& st) {
     auto& G = map.getGenes();
     const auto& g = G[st.geneIdx];
 
-    for (int i=0;i<STAT_H;++i) {
-        COORD p{0, SHORT(MAP_H + i)};
-        SetConsoleCursorPosition(hOut,p);
-        switch(i) {
-          case 0: std::cout<<"Stats:"; break;
-          case 1: std::cout<<" Total:"   <<stats.totalGenes; break;
-          case 2: std::cout<<" KO:"      <<stats.totalKnockouts; break;
-          case 3: std::cout<<" Expr:"    <<stats.avgExpression; break;
-          case 4: std::cout<<" Poly:"    <<stats.avgPolyScore; break;
-          case 5: std::cout<<" Updated:"<<stats.timestamp; break;
-          case 7: std::cout<<" Gene:"   <<g.symbol; break;
-          case 8: std::cout<<" Chr:"    <<g.chromosome<<" ["<<g.start<<"-"<<g.end<<"]"; break;
-          case 9: std::cout<<" ExpLvl:" <<g.expressionLevel; break;
-          case 10:std::cout<<" PScore:" <<g.polygenicScore; break;
-          case 11:std::cout<<" KO?:"    <<(g.isKnockout?"YES":"no"); break;
-        }
+    int y = MAP_H;
+    COORD p{0, SHORT(y)};
+    SetConsoleCursorPosition(hOut,p);
+
+    std::cout << "Stats:" << std::endl;
+    std::cout << " Total:"   << stats.totalGenes << std::endl;
+    std::cout << " KO:"      << stats.totalKnockouts << std::endl;
+    std::cout << " Expr:"    << stats.avgExpression << std::endl;
+    std::cout << " Poly:"    << stats.avgPolyScore << std::endl;
+    std::cout << " Updated:" << stats.timestamp << std::endl;
+    std::cout << std::endl;
+    std::cout << " Gene:"   << g.symbol << std::endl;
+    std::cout << " Chr:"    << g.chromosome << " [" << g.start << "-" << g.end << "]" << std::endl;
+    std::cout << " ExpLvl:" << g.expressionLevel << std::endl;
+    std::cout << " PScore:" << g.polygenicScore << std::endl;
+    std::cout << " KO?:"    << (g.isKnockout ? "YES" : "no") << std::endl;
+
+    std::cout << " Tags:";
+    for(const auto& tag : g.disorderTags) {
+        std::cout << " " << tag;
+    }
+    std::cout << std::endl;
+
+    std::cout << " Brain Expression:" << std::endl;
+    for(const auto&- kv : g.brainRegionExpression) {
+        std::cout << "  " << kv.first << ": " << kv.second << std::endl;
     }
 }
 
@@ -250,6 +260,26 @@ void handleMainKey(int vk, AlignmentMap& map, UIState& st) {
         case 'K':
             map.toggleKnockout(map.getGenes()[st.geneIdx].symbol);
             break;
+
+        case 'T': {
+            std::cout << "\nEnter disorder tag: ";
+            std::string tag = readLineFromConsole();
+            if (!tag.empty()) {
+                // This is a simplified implementation. A real application would need to modify the underlying data.
+                // map.addTagToGene(map.getGenes()[st.geneIdx].symbol, tag);
+            }
+            break;
+        }
+
+        case 'F': {
+            std::cout << "\nEnter gene set name to filter by: ";
+            std::string setName = readLineFromConsole();
+            if (!setName.empty()) {
+                // This is a simplified implementation. A real application would need to filter the gene list.
+                // map.filterGenesBySet(setName);
+            }
+            break;
+        }
 
         case 'L': {
             std::cout << "\nLoad genes from: (1) JSON  (2) CSV\nPress key: ";

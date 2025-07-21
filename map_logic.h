@@ -17,6 +17,8 @@ struct GeneModel {
     double      expressionLevel = 0.0;
     double      polygenicScore  = 0.0;
     bool        isKnockout      = false;
+    std::vector<std::string> disorderTags;
+    std::map<std::string, double> brainRegionExpression;
 };
 
 struct GenomeStats {
@@ -38,6 +40,15 @@ struct Pathway {
     std::map<std::string, std::vector<std::string>> interactions;
 };
 
+//-----------------------------------------------------------------------------
+// Gene set data structures
+//-----------------------------------------------------------------------------
+
+struct GeneSet {
+    std::string name;
+    std::vector<std::string> geneSymbols;
+};
+
 class AlignmentMap {
 public:
     void addGene(const GeneModel& g);
@@ -48,10 +59,13 @@ public:
     void toggleKnockout(const std::string& symbol);
     void addPathway(const Pathway& p);
     const std::vector<Pathway>& getPathways() const;
+    void addGeneSet(const GeneSet& gs);
+    const std::vector<GeneSet>& getGeneSets() const;
 
 private:
     std::vector<GeneModel> genes_;
     std::vector<Pathway> pathways_;
+    std::vector<GeneSet> geneSets_;
     std::string makeTimestamp() const;
 };
 
