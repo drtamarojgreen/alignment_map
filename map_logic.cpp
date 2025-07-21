@@ -49,6 +49,19 @@ void AlignmentMap::loadGenesFromCSV(const std::string& filename) {
             continue;
         }
 
+        // Parse categories from 5th column if it exists (semicolon-separated)
+        if (fields.size() > 4) {
+            std::stringstream cat_ss(fields[4]);
+            std::string category;
+            while (std::getline(cat_ss, category, ';')) {
+                // trim whitespace from category
+                size_t first = category.find_first_not_of(" \t");
+                if (std::string::npos == first) continue;
+                size_t last = category.find_last_not_of(" \t");
+                g.categories.push_back(category.substr(first, (last - first + 1)));
+            }
+        }
+
         // Set defaults for missing fields
         g.chromosome = "unknown";
         g.start = 0;
@@ -121,6 +134,23 @@ void AlignmentMap::loadGenesFromJSON(const std::string& filename) {
                 try {
                     g.expressionLevel = std::stod(numStr);
                 } catch (...) {}
+            }
+        }
+
+        // categories (array of strings)
+        size_t catPos = obj.find("\"categories\":");
+        if (catPos != std::string::npos) {
+            size_t arrStart = obj.find('[', catPos);
+            size_t arrEnd = obj.find(']', arrStart);
+            if (arrStart != std::string::npos && arrEnd != std::string::npos) {
+                std::string catArray = obj.substr(arrStart + 1, arrEnd - arrStart - 1);
+                size_t currentPos = 0;
+                while ((currentPos = catArray.find('"', currentPos)) != std::string::npos) {
+                    size_t quoteEnd = catArray.find('"', currentPos + 1);
+                    if (quoteEnd == std::string::npos) break;
+                    g.categories.push_back(catArray.substr(currentPos + 1, quoteEnd - currentPos - 1));
+                    currentPos = quoteEnd + 1;
+                }
             }
         }
 
@@ -285,9 +315,9 @@ std::string AlignmentMap::makeTimestamp() const {
 
 AlignmentMap createDemoMap() {
     AlignmentMap m;
-    m.addGene({"COMT","22",19929000,19957000,7.5,0.85,false});
-    m.addGene({"DRD2","11",113409000,113475000,6.2,0.72,false});
-    m.addGene({"BDNF","11",27650000,27700000,8.1,0.60,false});
+    m.addGene({"COMT","22",19929000,19957000,7.5,0.85,false, {"neurotransmitter regulation", "synaptic plasticity"}});
+    m.addGene({"DRD2","11",113409000,113475000,6.2,0.72,false, {"dopamine receptor", "synaptic plasticity"}});
+    m.addGene({"BDNF","11",27650000,27700000,8.1,0.60,false, {"neurotrophic factor", "neural development"}});
     return m;
 }
 

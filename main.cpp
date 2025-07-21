@@ -142,6 +142,12 @@ void drawMap(const AlignmentMap& map, UIState& st) {
 void drawStats(const AlignmentMap& map, UIState& st) {
     auto stats = map.calculateStatistics();
     auto& G = map.getGenes();
+    if (G.empty()) {
+        COORD p{0, SHORT(MAP_H)};
+        SetConsoleCursorPosition(hOut, p);
+        std::cout << "No genes loaded. Press 'L' to load a file.";
+        return;
+    }
     const auto& g = G[st.geneIdx];
 
     for (int i=0;i<STAT_H;++i) {
@@ -154,6 +160,17 @@ void drawStats(const AlignmentMap& map, UIState& st) {
           case 3: std::cout<<" Expr:"    <<stats.avgExpression; break;
           case 4: std::cout<<" Poly:"    <<stats.avgPolyScore; break;
           case 5: std::cout<<" Updated:"<<stats.timestamp; break;
+          case 6: {
+                std::cout << " Categories: ";
+                if (!g.categories.empty()) {
+                    for(size_t i = 0; i < g.categories.size(); ++i) {
+                        std::cout << g.categories[i] << (i < g.categories.size() - 1 ? "; " : "");
+                    }
+                } else {
+                    std::cout << "N/A";
+                }
+                break;
+          }
           case 7: std::cout<<" Gene:"   <<g.symbol; break;
           case 8: std::cout<<" Chr:"    <<g.chromosome<<" ["<<g.start<<"-"<<g.end<<"]"; break;
           case 9: std::cout<<" ExpLvl:" <<g.expressionLevel; break;
@@ -178,10 +195,17 @@ void handleMainKey(int vk, AlignmentMap& map, UIState& st) {
         case 'E':       st.cam.angle += 5; break;
         case 'W':       st.cam.zoom  *= 1.1; break;
         case 'S':       st.cam.zoom  /= 1.1; break;
-        case 'N':       st.geneIdx = (st.geneIdx + 1) % map.getGenes().size(); break;
-        case 'P':       st.geneIdx = (st.geneIdx + map.getGenes().size() - 1) % map.getGenes().size(); break;
+        case 'N':
+            if (!map.getGenes().empty())
+                st.geneIdx = (st.geneIdx + 1) % map.getGenes().size();
+            break;
+        case 'P':
+            if (!map.getGenes().empty())
+                st.geneIdx = (st.geneIdx + map.getGenes().size() - 1) % map.getGenes().size();
+            break;
         case 'K':
-            map.toggleKnockout(map.getGenes()[st.geneIdx].symbol);
+            if (!map.getGenes().empty())
+                map.toggleKnockout(map.getGenes()[st.geneIdx].symbol);
             break;
 
         case 'L': {

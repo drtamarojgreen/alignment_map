@@ -16,6 +16,7 @@ struct GeneModel {
     double      expressionLevel = 0.0;
     double      polygenicScore  = 0.0;
     bool        isKnockout      = false;
+    std::vector<std::string> categories;
 };
 
 struct GenomeStats {
