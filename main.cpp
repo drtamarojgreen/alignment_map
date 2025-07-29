@@ -3,7 +3,11 @@
 #include <windows.h>
 #include <iostream>
 #include <cmath>
+#include <iomanip>
+#include <vector>
 #include <conio.h>
+#include <iomanip>
+#include <vector>
 
 // Console global handles
 static HANDLE hIn, hOut;
@@ -14,9 +18,20 @@ constexpr int SCREEN_H = 24;
 constexpr int MAP_H    = SCREEN_H/2;
 constexpr int STAT_H   = SCREEN_H - MAP_H;
 
+// Camera and navigation constants
+constexpr double ANGLE_STEP = 5.0;
+constexpr double ZOOM_FACTOR = 1.1;
+
+
 // UI state
 struct Camera { double angle=45, zoom=1.0; int panX=0, panY=0; };
-struct UIState  { int geneIdx=0, pathwayIdx=0; Camera cam; bool inAlign=false, inPathway=false; };
+struct UIState  {
+    int geneIdx=0, pathwayIdx=0;
+    Camera cam;
+    bool inAlign=false, inPathway=false;
+    std::string statusMessage;
+    int statusMessageCounter = 0; // Frames to show message
+};
 
 // Forward prototypes
 void initConsole();
@@ -26,23 +41,41 @@ void drawStats(const AlignmentMap&, UIState&);
 void drawAlignment(AlignmentEditor&, UIState&);
 void drawPathway(const AlignmentMap&, UIState&);
 void handleMainKey(int vk, AlignmentMap&, UIState&);
-void handleAlignKey(int vk, AlignmentEditor&);
+void handleAlignKey(int vk, AlignmentEditor&, UIState&);
 
-std::string readLineFromConsole() {
+// Helper to show a message for a few frames
+void showStatusMessage(const std::string& msg, UIState& st) {
+    st.statusMessage = msg;
+    st.statusMessageCounter = 3; // Show for ~1-2 seconds
+}
+
+// Prompts user for input on the last line of the console without disrupting the UI
+std::string promptUser(const std::string& promptText) {
+    COORD p{0, SHORT(SCREEN_H - 1)};
+    SetConsoleCursorPosition(hOut, p);
+    std::cout << std::string(SCREEN_W, ' '); // Clear the line
+    SetConsoleCursorPosition(hOut, p);
+    std::cout << promptText;
+
     std::string line;
     char ch;
     while ((ch = _getch()) != '\r') { // Enter key
+        if (ch == 27) { // Escape key cancels
+            line.clear();
+            break;
+        }
         if (ch == '\b') {
             if (!line.empty()) {
                 line.pop_back();
                 std::cout << "\b \b";
             }
         } else {
-            line += ch;
-            std::cout << ch;
+            if (line.length() < SCREEN_W - promptText.length() - 2) {
+                line += ch;
+                std::cout << ch;
+            }
         }
     }
-    std::cout << '\n';
     return line;
 }
 
@@ -80,7 +113,7 @@ int main() {
                 st.inPathway = true;
             }
             else if (st.inAlign) {
-                handleAlignKey(vk, editor);
+                handleAlignKey(vk, editor, st);
             }
             else {
                 handleMainKey(vk, map, st);
@@ -96,10 +129,16 @@ int main() {
         } else {
             drawMap(map, st);
             drawStats(map, st);
-            // show mode hint
+            // Show footer with help text or a status message
             COORD p{0, SHORT(SCREEN_H-1)};
             SetConsoleCursorPosition(hOut, p);
-            std::cout << "[A]Align  [V]Pathway  [L]Load  [N/P]Next/Prev Gene  [←/→/↑/↓]Pan/Rotate/Zoom  [Esc]Quit";
+            if (st.statusMessageCounter > 0) {
+                std::cout << st.statusMessage << std::string(SCREEN_W - st.statusMessage.length(), ' ');
+                st.statusMessageCounter--;
+            } else {
+                std::string footer = "[A]Align [V]Pathway [L]Load [N/P]Gene [↑↓]Pan [←→]Rot [W/S]Zoom [K]KO [Esc]Quit";
+                std::cout << footer << std::string(SCREEN_W - footer.length(), ' ');
+            }
         }
     }
 
@@ -153,34 +192,44 @@ void drawMap(const AlignmentMap& map, UIState& st) {
 void drawStats(const AlignmentMap& map, UIState& st) {
     auto stats = map.calculateStatistics();
     auto& G = map.getGenes();
+    if (G.empty()) {
+        COORD p{0, SHORT(MAP_H)};
+        SetConsoleCursorPosition(hOut, p);
+        std::cout << "No genes loaded. Press 'L' to load a file.";
+        return;
+    }
     const auto& g = G[st.geneIdx];
 
-    int y = MAP_H;
-    COORD p{0, SHORT(y)};
-    SetConsoleCursorPosition(hOut,p);
-
-    std::cout << "Stats:" << std::endl;
-    std::cout << " Total:"   << stats.totalGenes << std::endl;
-    std::cout << " KO:"      << stats.totalKnockouts << std::endl;
-    std::cout << " Expr:"    << stats.avgExpression << std::endl;
-    std::cout << " Poly:"    << stats.avgPolyScore << std::endl;
-    std::cout << " Updated:" << stats.timestamp << std::endl;
-    std::cout << std::endl;
-    std::cout << " Gene:"   << g.symbol << std::endl;
-    std::cout << " Chr:"    << g.chromosome << " [" << g.start << "-" << g.end << "]" << std::endl;
-    std::cout << " ExpLvl:" << g.expressionLevel << std::endl;
-    std::cout << " PScore:" << g.polygenicScore << std::endl;
-    std::cout << " KO?:"    << (g.isKnockout ? "YES" : "no") << std::endl;
-
-    std::cout << " Tags:";
-    for(const auto& tag : g.disorderTags) {
-        std::cout << " " << tag;
+    // Clear stats area first
+    for (int i = 0; i < STAT_H; ++i) {
+        SetConsoleCursorPosition(hOut, {0, SHORT(MAP_H + i)});
+        std::cout << std::string(SCREEN_W, ' ');
     }
-    std::cout << std::endl;
 
-    std::cout << " Brain Expression:" << std::endl;
-    for(const auto&- kv : g.brainRegionExpression) {
-        std::cout << "  " << kv.first << ": " << kv.second << std::endl;
+    // Draw stats
+    SetConsoleCursorPosition(hOut, {0, SHORT(MAP_H)});
+    std::cout << std::fixed << std::setprecision(2);
+    std::cout << "--- Stats (Updated: " << stats.timestamp << ") ---";
+    SetConsoleCursorPosition(hOut, {0, SHORT(MAP_H + 1)});
+    std::cout << "Total Genes: " << stats.totalGenes << " | KOs: " << stats.totalKnockouts
+              << " | Avg Expr: " << stats.avgExpression;
+    SetConsoleCursorPosition(hOut, {0, SHORT(MAP_H + 2)});
+    std::cout << std::string(SCREEN_W, '-');
+
+    SetConsoleCursorPosition(hOut, {0, SHORT(MAP_H + 3)});
+    std::cout << "Gene: " << g.symbol << " (" << g.chromosome << ":" << g.start << "-" << g.end << ")";
+    SetConsoleCursorPosition(hOut, {0, SHORT(MAP_H + 4)});
+    std::cout << "ExprLvl: " << g.expressionLevel << " | PScore: " << g.polygenicScore << " | Knockout: " << (g.isKnockout ? "YES" : "no");
+    SetConsoleCursorPosition(hOut, {0, SHORT(MAP_H + 5)});
+    std::cout << "Disorder Tags: ";
+    for (const auto& tag : g.disorderTags) { std::cout << tag << " "; }
+    SetConsoleCursorPosition(hOut, {0, SHORT(MAP_H + 6)});
+    std::cout << "Brain Region Expression:";
+    int i = 0;
+    for (const auto& kv : g.brainRegionExpression) {
+        SetConsoleCursorPosition(hOut, {SHORT(i == 0 ? 2 : 25), SHORT(MAP_H + 7)});
+        std::cout << kv.first << ": " << kv.second;
+        i++;
     }
 }
 
@@ -197,6 +246,7 @@ void drawPathway(const AlignmentMap& map, UIState& st) {
         return;
     }
 
+    st.pathwayIdx = st.pathwayIdx % pathways.size();
     auto& p = pathways[st.pathwayIdx];
     COORD pos{0,0};
     SetConsoleCursorPosition(hOut, pos);
@@ -213,11 +263,14 @@ void drawPathway(const AlignmentMap& map, UIState& st) {
         y += 2;
     }
 
-    for(const auto&- kv : p.interactions) {
+    for(const auto& kv : p.interactions) {
         const auto& from = kv.first;
         for(const auto& to : kv.second) {
-            COORD p1 = genePositions[from];
-            COORD p2 = genePositions[to];
+            if (genePositions.find(from) == genePositions.end() || genePositions.find(to) == genePositions.end()) {
+                continue; // Skip drawing if gene isn't in the list
+            }
+            COORD p1 = genePositions.at(from);
+            COORD p2 = genePositions.at(to);
 
             // very basic line drawing
             int x1 = p1.X, y1 = p1.Y;
@@ -232,7 +285,7 @@ void drawPathway(const AlignmentMap& map, UIState& st) {
         }
     }
 
-    for(const auto&- kv : genePositions) {
+    for(const auto& kv : genePositions) {
         SetConsoleCursorPosition(hOut, kv.second);
         std::cout << "[" << kv.first << "]";
     }
@@ -241,74 +294,61 @@ void drawPathway(const AlignmentMap& map, UIState& st) {
 void handleMainKey(int vk, AlignmentMap& map, UIState& st) {
     if (st.inPathway) {
         switch(vk) {
-            case VK_UP:   st.pathwayIdx = (st.pathwayIdx + map.getPathways().size() - 1) % map.getPathways().size(); break;
-            case VK_DOWN: st.pathwayIdx = (st.pathwayIdx + 1) % map.getPathways().size(); break;
+            case VK_UP:
+            case 'P': // Previous
+                if (!map.getPathways().empty())
+                    st.pathwayIdx = (st.pathwayIdx + map.getPathways().size() - 1) % map.getPathways().size();
+                break;
+            case VK_DOWN:
+            case 'N': // Next
+                if (!map.getPathways().empty())
+                    st.pathwayIdx = (st.pathwayIdx + 1) % map.getPathways().size();
+                break;
         }
         return;
     }
     switch(vk) {
-        case VK_LEFT:   st.cam.panX  -= 1; break;
-        case VK_RIGHT:  st.cam.panX  += 1; break;
+        case VK_LEFT:   st.cam.angle -= ANGLE_STEP; break;
+        case VK_RIGHT:  st.cam.angle += ANGLE_STEP; break;
         case VK_UP:     st.cam.panY  -= 1; break;
         case VK_DOWN:   st.cam.panY  += 1; break;
-        case 'Q':       st.cam.angle -= 5; break;
-        case 'E':       st.cam.angle += 5; break;
-        case 'W':       st.cam.zoom  *= 1.1; break;
-        case 'S':       st.cam.zoom  /= 1.1; break;
-        case 'N':       st.geneIdx = (st.geneIdx + 1) % map.getGenes().size(); break;
-        case 'P':       st.geneIdx = (st.geneIdx + map.getGenes().size() - 1) % map.getGenes().size(); break;
+        case 'W':       st.cam.zoom  *= ZOOM_FACTOR; break;
+        case 'S':       st.cam.zoom  /= ZOOM_FACTOR; break;
+        case 'N': // Next Gene
+            if (!map.getGenes().empty())
+                st.geneIdx = (st.geneIdx + 1) % map.getGenes().size();
+            break;
+        case 'P': // Previous Gene
+            if (!map.getGenes().empty())
+                st.geneIdx = (st.geneIdx + map.getGenes().size() - 1) % map.getGenes().size();
+            break;
         case 'K':
-            map.toggleKnockout(map.getGenes()[st.geneIdx].symbol);
+            if (!map.getGenes().empty())
+                map.toggleKnockout(map.getGenes()[st.geneIdx].symbol);
             break;
-
-        case 'T': {
-            std::cout << "\nEnter disorder tag: ";
-            std::string tag = readLineFromConsole();
-            if (!tag.empty()) {
-                // This is a simplified implementation. A real application would need to modify the underlying data.
-                // map.addTagToGene(map.getGenes()[st.geneIdx].symbol, tag);
-            }
-            break;
-        }
-
-        case 'F': {
-            std::cout << "\nEnter gene set name to filter by: ";
-            std::string setName = readLineFromConsole();
-            if (!setName.empty()) {
-                // This is a simplified implementation. A real application would need to filter the gene list.
-                // map.filterGenesBySet(setName);
-            }
-            break;
-        }
-
-        case 'L': {
-            std::cout << "\nLoad genes from: (1) JSON  (2) CSV\nPress key: ";
-            char key = _getch();
-            std::cout << key << "\n";
-
-            std::cout << "Enter gene file path: ";
-            std::string filepath = readLineFromConsole();
+        case 'L': 
+            std::string filepath = promptUser("Load gene file path (or Esc to cancel): ");
             if (filepath.empty()) {
-                std::cout << "No file path provided.\n";
+                showStatusMessage("File loading cancelled.", st);
                 break;
             }
-
-            bool success = false;
-            if (key == '1') {
+            // Basic file type detection
+            if (filepath.size() > 5 && filepath.substr(filepath.size() - 5) == ".json") {
                 map.loadGenesFromJSON(filepath);
-            } else if (key == '2') {
+                showStatusMessage("Loaded genes from JSON: " + filepath, st);
+            } else if (filepath.size() > 4 && filepath.substr(filepath.size() - 4) == ".csv") {
                 map.loadGenesFromCSV(filepath);
+                showStatusMessage("Loaded genes from CSV: " + filepath, st);
             } else {
-                std::cout << "Invalid option.\n";
-                break;
+                showStatusMessage("Error: Unknown file type for: " + filepath, st);
             }
-
+            st.geneIdx = 0; // Reset index after loading
             break;
         }
-    }
-}
+   }
 
-void handleAlignKey(int vk, AlignmentEditor& ed) {
+
+void handleAlignKey(int vk, AlignmentEditor& ed, UIState& st) {
     switch(vk) {
         case VK_LEFT:  ed.moveCursor(-1); break;
         case VK_RIGHT: ed.moveCursor(+1); break;
@@ -318,34 +358,28 @@ void handleAlignKey(int vk, AlignmentEditor& ed) {
         case 'R':      ed.reverseComplementSelected(); break;
 
         case 'E': {
-            char b = 'A';
-            std::cout << "\nBase (A/C/G/T/U): ";
-            std::cin >> b;
-            ed.editSelectedBase(b);
-            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            std::string base = promptUser("Enter new base (or Esc to cancel): ");
+            if (!base.empty()) {
+                ed.editSelectedBase(base[0]);
+            }
             break;
         }
 
         case 'L': {
-            std::cout << "\nLoad sequences: (1) JSON  (2) CSV\nPress key: ";
-            char key = _getch();
-            std::cout << key << "\n";
-
-            std::cout << "Enter sequence file path: ";
-            std::string filepath = readLineFromConsole();
+            std::string filepath = promptUser("Load sequence file path (or Esc to cancel): ");
             if (filepath.empty()) {
-                std::cout << "No file path provided.\n";
+                showStatusMessage("File loading cancelled.", st);
                 break;
             }
 
-            bool success = false;
-            if (key == '1') {
+            if (filepath.size() > 5 && filepath.substr(filepath.size() - 5) == ".json") {
                 ed.loadSequencesFromJSON(filepath);
-            } else if (key == '2') {
+                showStatusMessage("Loaded sequences from JSON: " + filepath, st);
+            } else if (filepath.size() > 4 && filepath.substr(filepath.size() - 4) == ".csv") {
                 ed.loadSequencesFromCSV(filepath);
+                showStatusMessage("Loaded sequences from CSV: " + filepath, st);
             } else {
-                std::cout << "Invalid option.\n";
-                break;
+                showStatusMessage("Error: Unknown file type for: " + filepath, st);
             }
 
             break;

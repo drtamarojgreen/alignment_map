@@ -4,6 +4,7 @@
 #include <vector>
 #include <chrono>
 #include <map>
+#include <stddef.h>
 
 //-----------------------------------------------------------------------------
 // Gene‐map data structures
