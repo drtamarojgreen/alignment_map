@@ -5,7 +5,9 @@
 #include <iomanip>
 #include <algorithm>
 #include <iostream>
+#if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
+#endif
 #include <fstream>
 #include <sstream>
 #include <vector>
@@ -358,7 +360,12 @@ void AlignmentMap::toggleKnockout(const std::string& symbol) {
 
 std::string AlignmentMap::makeTimestamp() const {
     auto now = std::time(nullptr);
-    std::tm tm; localtime_s(&tm, &now);
+    std::tm tm;
+#if defined(_WIN32) || defined(_WIN64)
+    localtime_s(&tm, &now);
+#else
+    tm = *std::localtime(&now);
+#endif
     std::ostringstream ss;
     ss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
     return ss.str();
@@ -418,6 +425,7 @@ void AlignmentEditor::loadDemoDNA() {
 }
 
 void AlignmentEditor::render(int width, int height) const {
+#if defined(_WIN32) || defined(_WIN64)
     // Header
     COORD pos{0,0};
     auto hOut = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -454,6 +462,12 @@ void AlignmentEditor::render(int width, int height) const {
     std::cout
       << "[<-->]Move Cursor  [^/v]Select Seq  "
       << "[L]Load  [G]Gap  [R]RevComp  [E]Edit";
+#else
+    // Non-Windows stub
+    (void)width; // unused
+    (void)height; // unused
+    std::cout << "Rendering is not supported on this platform." << std::endl;
+#endif
 }
 
 void AlignmentEditor::moveCursor(int delta) {
@@ -488,6 +502,10 @@ void AlignmentEditor::editSelectedBase(char base) {
     int p = block_.cursorPos;
     if (p<0||p>=int(s.aligned.size())) return;
     s.aligned[p] = std::toupper(base);
+}
+
+const std::vector<SequenceModel>& AlignmentEditor::getSequences() const {
+    return block_.sequences;
 }
 
 char AlignmentEditor::complement(char b, SequenceType t) const {

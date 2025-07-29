@@ -106,6 +106,9 @@ public:
     void reverseComplementSelected();
     void editSelectedBase(char base);
 
+    // Public for testing purposes
+    const std::vector<SequenceModel>& getSequences() const;
+
 private:
     AlignmentBlock block_;
 

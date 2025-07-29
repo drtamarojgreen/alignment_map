@@ -43,4 +43,17 @@ std::vector<GeneModel> fetchGeneDataFromNCBI(const std::vector<std::string>& gen
 
 // --- Private Helper Function Implementations ---
 
-static std::string httpGetRequest(const std::string
+// Performs a basic HTTP GET request.
+// NOTE: This is a placeholder for a platform-specific implementation (e.g., using WinINet on Windows).
+static std::string httpGetRequest(const std::string& url, const std::string& api_key) {
+    // This is a dummy implementation for compilation and testing purposes.
+    // It does not perform a real HTTP request.
+    return "";
+}
+
+// Parses a JSON response from the NCBI Gene API.
+// NOTE: This is a placeholder for a minimal, purpose-built parser. It is NOT a full JSON parser.
+static std::vector<GeneModel> parseGeneJson(const std::string& json_response) {
+    // This is a dummy implementation.
+    return {};
+}
