@@ -1,0 +1,6 @@
+gene_name,knockout,status,expression_level,disorderTags,brainRegionExpression
+TCF4,,Active,8.5,Pitt-Hopkins;Schizophrenia,Cortex:0.88;Hippocampus:0.75
+MECP2,X,Inactive,4.2,Rett Syndrome,Cerebellum:0.6
+SHANK3,,Active,7.1,ASD;Phelan-McDermid,Striatum:0.9;Cortex:0.8
+MALFORMED,X,Error,invalid_level,Tag,Region:0.1
+MISSING_COLS,X,Active,5.0
