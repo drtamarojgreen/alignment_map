@@ -1,0 +1,25 @@
+{
+  "genes": [
+    {
+      "gene_name": "TCF4",
+      "knockout": false,
+      "status": "Active",
+      "expression_level": 8.5,
+      "disorderTags": ["Pitt-Hopkins", "Schizophrenia"],
+      "brainRegionExpression": {
+        "Cortex": 0.88,
+        "Hippocampus": 0.75
+      }
+    },
+    {
+      "gene_name": "MECP2",
+      "knockout": true,
+      "status": "Inactive",
+      "expression_level": 4.2,
+      "disorderTags": ["Rett Syndrome"],
+      "brainRegionExpression": {
+        "Cerebellum": 0.6
+      }
+    }
+  ]
+}

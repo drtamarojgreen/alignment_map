@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 #include <chrono>
+#include <map>
+#include <stddef.h>
 
 //-----------------------------------------------------------------------------
 // Gene‐map data structures
@@ -17,6 +19,9 @@ struct GeneModel {
     double      polygenicScore  = 0.0;
     bool        isKnockout      = false;
     std::vector<std::string> categories;
+    std::vector<std::string> disorderTags;
+    std::map<std::string, double> brainRegionExpression;
+
 };
 
 struct GenomeStats {
@@ -27,6 +32,26 @@ struct GenomeStats {
     std::string timestamp;
 };
 
+//-----------------------------------------------------------------------------
+// Pathway data structures
+//-----------------------------------------------------------------------------
+
+struct Pathway {
+    std::string name;
+    std::string description;
+    std::vector<std::string> geneSymbols;
+    std::map<std::string, std::vector<std::string>> interactions;
+};
+
+//-----------------------------------------------------------------------------
+// Gene set data structures
+//-----------------------------------------------------------------------------
+
+struct GeneSet {
+    std::string name;
+    std::vector<std::string> geneSymbols;
+};
+
 class AlignmentMap {
 public:
     void addGene(const GeneModel& g);
@@ -35,13 +60,20 @@ public:
     void loadGenesFromCSV(const std::string& filename);
     void loadGenesFromJSON(const std::string& filename);
     void toggleKnockout(const std::string& symbol);
+    void addPathway(const Pathway& p);
+    const std::vector<Pathway>& getPathways() const;
+    void addGeneSet(const GeneSet& gs);
+    const std::vector<GeneSet>& getGeneSets() const;
 
 private:
     std::vector<GeneModel> genes_;
+    std::vector<Pathway> pathways_;
+    std::vector<GeneSet> geneSets_;
     std::string makeTimestamp() const;
 };
 
 AlignmentMap createDemoMap();
+std::vector<Pathway> createDemoPathways();
 
 //-----------------------------------------------------------------------------
 // Sequence‐alignment data structures
@@ -75,6 +107,9 @@ public:
     void toggleGap();
     void reverseComplementSelected();
     void editSelectedBase(char base);
+
+    // Public for testing purposes
+    const std::vector<SequenceModel>& getSequences() const;
 
 private:
     AlignmentBlock block_;

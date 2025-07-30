@@ -5,10 +5,13 @@
 #include <iomanip>
 #include <algorithm>
 #include <iostream>
+#if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
+#endif
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <cstddef>
 
 //-----------------------------------------------------------------------------
 // AlignmentMap additional methods
@@ -49,6 +52,7 @@ void AlignmentMap::loadGenesFromCSV(const std::string& filename) {
             continue;
         }
 
+
         // Parse categories from 5th column if it exists (semicolon-separated)
         if (fields.size() > 4) {
             std::stringstream cat_ss(fields[4]);
@@ -59,6 +63,19 @@ void AlignmentMap::loadGenesFromCSV(const std::string& filename) {
                 if (std::string::npos == first) continue;
                 size_t last = category.find_last_not_of(" \t");
                 g.categories.push_back(category.substr(first, (last - first + 1)));
+
+        }
+
+        if (fields.size() > 5) {
+            std::stringstream ss(fields[5]);
+            std::string kv;
+            while(std::getline(ss, kv, ';')) {
+                size_t sep = kv.find(':');
+                if (sep != std::string::npos) {
+                    std::string region = kv.substr(0, sep);
+                    double expr = std::stod(kv.substr(sep + 1));
+                    g.brainRegionExpression[region] = expr;
+                }
             }
         }
 
@@ -75,6 +92,7 @@ void AlignmentMap::loadGenesFromCSV(const std::string& filename) {
 void AlignmentMap::loadGenesFromJSON(const std::string& filename) {
     std::ifstream file(filename);
     if (!file.is_open()) {
+        std::cout << "DEBUG: JSON file not opened: " << filename << std::endl;
         std::cerr << "Error: Could not open JSON file " << filename << std::endl;
         return;
     }
@@ -91,8 +109,8 @@ void AlignmentMap::loadGenesFromJSON(const std::string& filename) {
 
     // Simplified parsing - extract objects (this is basic and may need enhancement)
     size_t start = content.find('[', pos);
-    size_t end = content.find(']', start);
-    if (start == std::string::npos || end == std::string::npos) return;
+    size_t end = content.rfind(']'); // Use rfind to get the last bracket
+    if (start == std::string::npos || end == std::string::npos || end < start) return;
 
     std::string arrayContent = content.substr(start + 1, end - start - 1);
 
@@ -137,6 +155,7 @@ void AlignmentMap::loadGenesFromJSON(const std::string& filename) {
             }
         }
 
+
         // categories (array of strings)
         size_t catPos = obj.find("\"categories\":");
         if (catPos != std::string::npos) {
@@ -150,6 +169,47 @@ void AlignmentMap::loadGenesFromJSON(const std::string& filename) {
                     if (quoteEnd == std::string::npos) break;
                     g.categories.push_back(catArray.substr(currentPos + 1, quoteEnd - currentPos - 1));
                     currentPos = quoteEnd + 1;
+
+        // disorderTags
+        size_t tagsPos = obj.find("\"disorderTags\":");
+        if (tagsPos != std::string::npos) {
+            size_t start = obj.find('[', tagsPos);
+            size_t end = obj.find(']', start);
+            if (start != std::string::npos && end != std::string::npos) {
+                std::string tagsStr = obj.substr(start + 1, end - start - 1);
+                std::stringstream ss(tagsStr);
+                std::string tag;
+                while(std::getline(ss, tag, ',')) {
+                    size_t quote1 = tag.find('"');
+                    size_t quote2 = tag.find('"', quote1 + 1);
+                    if (quote1 != std::string::npos && quote2 != std::string::npos) {
+                        g.disorderTags.push_back(tag.substr(quote1 + 1, quote2 - quote1 - 1));
+                    }
+                }
+            }
+        }
+
+        // brainRegionExpression
+        size_t brainPos = obj.find("\"brainRegionExpression\":");
+        if (brainPos != std::string::npos) {
+            size_t start = obj.find('{', brainPos);
+            size_t end = obj.find('}', start);
+            if (start != std::string::npos && end != std::string::npos) {
+                std::string brainStr = obj.substr(start + 1, end - start - 1);
+                std::stringstream ss(brainStr);
+                std::string kv;
+                while(std::getline(ss, kv, ',')) {
+                    size_t sep = kv.find(':');
+                    if (sep != std::string::npos) {
+                        size_t quote1 = kv.find('"');
+                        size_t quote2 = kv.find('"', quote1 + 1);
+                        if (quote1 != std::string::npos && quote2 != std::string::npos) {
+                            std::string region = kv.substr(quote1 + 1, quote2 - quote1 - 1);
+                            double expr = std::stod(kv.substr(sep + 1));
+                            g.brainRegionExpression[region] = expr;
+                        }
+                    }
+
                 }
             }
         }
@@ -275,8 +335,24 @@ void AlignmentMap::addGene(const GeneModel& g) {
     genes_.push_back(g);
 }
 
+void AlignmentMap::addPathway(const Pathway& p) {
+    pathways_.push_back(p);
+}
+
 const std::vector<GeneModel>& AlignmentMap::getGenes() const {
     return genes_;
+}
+
+const std::vector<Pathway>& AlignmentMap::getPathways() const {
+    return pathways_;
+}
+
+void AlignmentMap::addGeneSet(const GeneSet& gs) {
+    geneSets_.push_back(gs);
+}
+
+const std::vector<GeneSet>& AlignmentMap::getGeneSets() const {
+    return geneSets_;
 }
 
 GenomeStats AlignmentMap::calculateStatistics() const {
@@ -307,7 +383,12 @@ void AlignmentMap::toggleKnockout(const std::string& symbol) {
 
 std::string AlignmentMap::makeTimestamp() const {
     auto now = std::time(nullptr);
-    std::tm tm; localtime_s(&tm, &now);
+    std::tm tm;
+#if defined(_WIN32) || defined(_WIN64)
+    localtime_s(&tm, &now);
+#else
+    tm = *std::localtime(&now);
+#endif
     std::ostringstream ss;
     ss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
     return ss.str();
@@ -319,6 +400,34 @@ AlignmentMap createDemoMap() {
     m.addGene({"DRD2","11",113409000,113475000,6.2,0.72,false, {"dopamine receptor", "synaptic plasticity"}});
     m.addGene({"BDNF","11",27650000,27700000,8.1,0.60,false, {"neurotrophic factor", "neural development"}});
     return m;
+}
+
+std::vector<Pathway> createDemoPathways() {
+    std::vector<Pathway> pathways;
+
+    Pathway p1;
+    p1.name = "Neural Plasticity";
+    p1.description = "Pathway involved in learning and memory";
+    p1.geneSymbols = {"BDNF", "CREB1", "GRIN2B", "CAMK2A"};
+    p1.interactions = {
+        {"BDNF", {"CREB1", "CAMK2A"}},
+        {"CREB1", {"GRIN2B"}},
+        {"CAMK2A", {"GRIN2B"}}
+    };
+    pathways.push_back(p1);
+
+    Pathway p2;
+    p2.name = "Caspase-Mediated Apoptosis";
+    p2.description = "Pathway involved in programmed cell death";
+    p2.geneSymbols = {"CASP3", "CASP8", "CASP9", "BCL2"};
+    p2.interactions = {
+        {"CASP8", {"CASP3"}},
+        {"CASP9", {"CASP3"}},
+        {"BCL2", {"CASP9"}}
+    };
+    pathways.push_back(p2);
+
+    return pathways;
 }
 
 //-----------------------------------------------------------------------------
@@ -339,6 +448,7 @@ void AlignmentEditor::loadDemoDNA() {
 }
 
 void AlignmentEditor::render(int width, int height) const {
+#if defined(_WIN32) || defined(_WIN64)
     // Header
     COORD pos{0,0};
     auto hOut = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -375,6 +485,12 @@ void AlignmentEditor::render(int width, int height) const {
     std::cout
       << "[<-->]Move Cursor  [^/v]Select Seq  "
       << "[L]Load  [G]Gap  [R]RevComp  [E]Edit";
+#else
+    // Non-Windows stub
+    (void)width; // unused
+    (void)height; // unused
+    std::cout << "Rendering is not supported on this platform." << std::endl;
+#endif
 }
 
 void AlignmentEditor::moveCursor(int delta) {
@@ -409,6 +525,10 @@ void AlignmentEditor::editSelectedBase(char base) {
     int p = block_.cursorPos;
     if (p<0||p>=int(s.aligned.size())) return;
     s.aligned[p] = std::toupper(base);
+}
+
+const std::vector<SequenceModel>& AlignmentEditor::getSequences() const {
+    return block_.sequences;
 }
 
 char AlignmentEditor::complement(char b, SequenceType t) const {

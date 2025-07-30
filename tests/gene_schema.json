@@ -1,0 +1,47 @@
+{
+  "description": "Schema for gene data files used in the Alignment Map Viewer.",
+  "type": "object",
+  "properties": {
+    "genes": {
+      "type": "array",
+      "description": "An array of gene objects.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "gene_name": {
+            "type": "string",
+            "description": "The symbol or name of the gene."
+          },
+          "knockout": {
+            "type": "boolean",
+            "description": "Indicates if the gene is knocked out."
+          },
+          "status": {
+            "type": "string",
+            "description": "The current status of the gene (e.g., Active, Inactive)."
+          },
+          "expression_level": {
+            "type": "number",
+            "description": "The measured expression level of the gene."
+          },
+          "disorderTags": {
+            "type": "array",
+            "description": "A list of associated genetic disorders.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "brainRegionExpression": {
+            "type": "object",
+            "description": "A map of brain regions to expression levels.",
+            "additionalProperties": {
+              "type": "number"
+            }
+          }
+        },
+        "required": ["gene_name", "knockout", "expression_level"]
+      }
+    }
+  },
+  "required": ["genes"]
+}
