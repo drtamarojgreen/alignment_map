@@ -200,11 +200,8 @@ void drawStats(const AlignmentMap& map, UIState& st) {
     }
     const auto& g = G[st.geneIdx];
 
-    // Clear stats area first
-    for (int i = 0; i < STAT_H; ++i) {
-        SetConsoleCursorPosition(hOut, {0, SHORT(MAP_H + i)});
-        std::cout << std::string(SCREEN_W, ' ');
-    }
+    for (int i=0;i<STAT_H;++i) {
+        COORD p{0, SHORT(MAP_H + i)};
 
     // Draw stats
     SetConsoleCursorPosition(hOut, {0, SHORT(MAP_H)});
@@ -230,6 +227,7 @@ void drawStats(const AlignmentMap& map, UIState& st) {
         SetConsoleCursorPosition(hOut, {SHORT(i == 0 ? 2 : 25), SHORT(MAP_H + 7)});
         std::cout << kv.first << ": " << kv.second;
         i++;
+
     }
 }
 
@@ -312,6 +310,8 @@ void handleMainKey(int vk, AlignmentMap& map, UIState& st) {
         case VK_RIGHT:  st.cam.angle += ANGLE_STEP; break;
         case VK_UP:     st.cam.panY  -= 1; break;
         case VK_DOWN:   st.cam.panY  += 1; break;
+        case 'Q':       st.cam.angle -= 5; break;
+        case 'E':       st.cam.angle += 5; break;
         case 'W':       st.cam.zoom  *= ZOOM_FACTOR; break;
         case 'S':       st.cam.zoom  /= ZOOM_FACTOR; break;
         case 'N': // Next Gene

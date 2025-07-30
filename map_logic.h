@@ -18,8 +18,10 @@ struct GeneModel {
     double      expressionLevel = 0.0;
     double      polygenicScore  = 0.0;
     bool        isKnockout      = false;
+    std::vector<std::string> categories;
     std::vector<std::string> disorderTags;
     std::map<std::string, double> brainRegionExpression;
+
 };
 
 struct GenomeStats {
