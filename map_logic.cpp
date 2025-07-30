@@ -86,6 +86,7 @@ void AlignmentMap::loadGenesFromCSV(const std::string& filename) {
 void AlignmentMap::loadGenesFromJSON(const std::string& filename) {
     std::ifstream file(filename);
     if (!file.is_open()) {
+        std::cout << "DEBUG: JSON file not opened: " << filename << std::endl;
         std::cerr << "Error: Could not open JSON file " << filename << std::endl;
         return;
     }
@@ -102,8 +103,8 @@ void AlignmentMap::loadGenesFromJSON(const std::string& filename) {
 
     // Simplified parsing - extract objects (this is basic and may need enhancement)
     size_t start = content.find('[', pos);
-    size_t end = content.find(']', start);
-    if (start == std::string::npos || end == std::string::npos) return;
+    size_t end = content.rfind(']'); // Use rfind to get the last bracket
+    if (start == std::string::npos || end == std::string::npos || end < start) return;
 
     std::string arrayContent = content.substr(start + 1, end - start - 1);
 
