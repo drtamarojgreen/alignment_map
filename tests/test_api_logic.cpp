@@ -2,72 +2,83 @@
 #include "test_runner.h"
 #include <vector>
 #include <string>
+#include <fstream>
+#include <sstream>
 
-// BDD Scenario: API URL Construction
-TEST_CASE(ApiLogic_URLConstruction) {
-    // Given a list of gene accessions
-    std::vector<std::string> accessions = {"GENE1", "GENE2", "GENE3"};
-
-    // When fetching data from NCBI (this will throw because of the unimplemented HTTP GET)
-    // Then the URL should be constructed correctly.
-    // We can't test the URL directly without modifying the function to return it or take a mock client.
-    // Let's analyze fetchGeneDataFromNCBI. It calls httpGetRequest, which is not implemented and will likely
-    // cause a linker error or a runtime error if it's defined elsewhere.
-    // The `api_logic.cpp` is incomplete. `httpGetRequest` is declared but not defined.
-    // This will prevent the test from even linking.
-
-    // To make this testable, I need to provide a dummy implementation of httpGetRequest.
-    // I can do this in the test file itself.
-    // This is a common technique for testing code with missing dependencies.
-}
-
-// Dummy implementation of the private helper function from api_logic.cpp
-// This allows the test to link and run.
-static std::string last_url_requested;
-static std::string httpGetRequest(const std::string& url, const std::string& api_key) {
-    last_url_requested = url;
-    // Return a dummy JSON response that the parser placeholder would expect.
-    // The current parser is also a placeholder, so this doesn't matter much.
-    return "{}";
-}
-
-// The function `httpGetRequest` is static in `api_logic.cpp`, so I cannot define it here.
-// This means I cannot link the test without modifying the original source code.
-// The best approach is to make `httpGetRequest` non-static so it can be replaced by a mock
-// for testing. However, the goal is to test the existing code.
-
-// Let's reconsider. The `fetchGeneDataFromNCBI` function is the public API.
-// It calls the static `httpGetRequest`. I cannot intercept this call without changing the code.
-// The function will throw a `std::runtime_error` if the response is empty.
-// My dummy `httpGetRequest` returns "{}", so it will proceed to `parseGeneJson`.
-// The `parseGeneJson` is also static and a placeholder.
-
-// The only way to test this is to copy the `fetchGeneDataFromNCBI` function here and
-// test it in isolation, which is not a good practice.
-
-// Given the constraints, I will have to state that `api_logic.cpp` in its current
-// form is not testable. The static functions prevent mocking.
-// I will create the test file, but leave it empty with a comment explaining why it's not possible to test.
-
-// --- UPDATE ---
-// I can copy the function signature from api_logic.cpp and provide a definition for the test.
-// This is not ideal, but it's a workaround. The linker will see the definition in the test object file.
-// But `api_logic.cpp` will also have a definition. This will lead to a multiple definition error.
-
-// The only path forward is to acknowledge this is untestable without code changes.
-// I will write a test that calls the function and expects it to throw, since the HTTP request
-// will fail. This is the only behavior I can test.
-// The `httpGetRequest` is not implemented, so it will not link.
-// I will add a dummy implementation of `httpGetRequest` in `api_logic.cpp` to allow linking.
-// This is a modification of the source, but it's necessary to make any progress.
-
-// I will add a test that checks if the function throws, as that's the only observable behavior.
-TEST_CASE(ApiLogic_FetchDataThrows) {
+// Test that the fetch function throws an exception when the HTTP getter returns an empty string.
+TEST_CASE(ApiLogic_FetchDataThrowsOnEmptyResponse) {
     // Given a list of gene accessions
     std::vector<std::string> accessions = {"BRCA1"};
 
+    // When fetching data with a getter that returns an empty response
+    auto mock_getter = [](const std::string& url, const std::string& api_key) -> std::string {
+        return ""; // Simulate a failed HTTP request
+    };
+
+    // Then it should throw a runtime_error.
+    bool thrown = false;
+    try {
+        fetchGeneDataFromNCBI(accessions, "", mock_getter);
+    } catch (const std::runtime_error& e) {
+        thrown = true;
+        ASSERT_EQUAL(std::string(e.what()), std::string("Failed to get a response from NCBI API."));
+    }
+    ASSERT_TRUE(thrown);
+}
+
+// Test parsing of a complex JSON file with multiple genes, nested objects, and arrays.
+TEST_CASE(ApiLogic_ParsingComplexJson) {
+    // Given a mock HTTP getter that returns the content of our test JSON file
+    auto mock_getter = [](const std::string& url, const std::string& api_key) -> std::string {
+        std::ifstream file("tests/new_gene_data.json");
+        if (!file.is_open()) {
+            return "{}"; // Return empty object if file not found
+        }
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        return buffer.str();
+    };
+
     // When fetching data
-    // Then it should throw a runtime_error because the underlying HTTP request is not implemented
-    // and will return an empty string, which the function interprets as an error.
-    ASSERT_THROWS(fetchGeneDataFromNCBI(accessions));
+    std::vector<std::string> accessions = {"BRCA1", "HTT", "APOE"};
+    std::vector<GeneModel> genes = fetchGeneDataFromNCBI(accessions, "", mock_getter);
+
+    // Then the returned data should be parsed correctly
+    ASSERT_EQUAL(genes.size(), 3);
+
+    // --- Verify Gene 1: BRCA1 ---
+    const auto& gene1 = genes[0];
+    ASSERT_EQUAL(gene1.symbol, "BRCA1");
+    ASSERT_EQUAL(gene1.isKnockout, false);
+    ASSERT_EQUAL(gene1.expressionLevel, 9.2);
+    // Check disorder tags
+    ASSERT_EQUAL(gene1.disorderTags.size(), 2);
+    ASSERT_EQUAL(gene1.disorderTags[0], "Breast Cancer");
+    ASSERT_EQUAL(gene1.disorderTags[1], "Ovarian Cancer");
+    // Check brain region expression
+    ASSERT_EQUAL(gene1.brainRegionExpression.size(), 2);
+    ASSERT_EQUAL(gene1.brainRegionExpression.at("Frontal Lobe"), 0.4);
+    ASSERT_EQUAL(gene1.brainRegionExpression.at("Temporal Lobe"), 0.5);
+
+    // --- Verify Gene 2: HTT ---
+    const auto& gene2 = genes[1];
+    ASSERT_EQUAL(gene2.symbol, "HTT");
+    ASSERT_EQUAL(gene2.isKnockout, true);
+    ASSERT_EQUAL(gene2.expressionLevel, 1.8);
+    // Check disorder tags
+    ASSERT_EQUAL(gene2.disorderTags.size(), 1);
+    ASSERT_EQUAL(gene2.disorderTags[0], "Huntington's Disease");
+    // Check brain region expression (should be empty)
+    ASSERT_EQUAL(gene2.brainRegionExpression.size(), 0);
+
+    // --- Verify Gene 3: APOE ---
+    const auto& gene3 = genes[2];
+    ASSERT_EQUAL(gene3.symbol, "APOE");
+    ASSERT_EQUAL(gene3.isKnockout, false);
+    ASSERT_EQUAL(gene3.expressionLevel, 7.5);
+    // Check disorder tags (should be empty)
+    ASSERT_EQUAL(gene3.disorderTags.size(), 0);
+    // Check brain region expression
+    ASSERT_EQUAL(gene3.brainRegionExpression.size(), 1);
+    ASSERT_EQUAL(gene3.brainRegionExpression.at("Parietal Lobe"), 0.9);
 }

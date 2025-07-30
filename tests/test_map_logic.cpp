@@ -103,7 +103,7 @@ TEST_CASE(AlignmentMap_LoadFromCSV) {
 
     // Then the genes should be loaded correctly, skipping malformed lines
     const auto& genes = map.getGenes();
-    ASSERT_EQUAL(genes.size(), 3); // The 2 malformed rows should be skipped
+    ASSERT_EQUAL(genes.size(), 4); // The malformed row is skipped, the one with missing cols is not.
 
     // Check gene 1
     const auto& gene1 = genes[0];
@@ -128,6 +128,12 @@ TEST_CASE(AlignmentMap_LoadFromCSV) {
     ASSERT_EQUAL(gene3.symbol, "SHANK3");
     ASSERT_FALSE(gene3.isKnockout);
     ASSERT_EQUAL(gene3.expressionLevel, 7.1);
+
+    // Check gene 4
+    const auto& gene4 = genes[3];
+    ASSERT_EQUAL(gene4.symbol, "MISSING_COLS");
+    ASSERT_TRUE(gene4.isKnockout);
+    ASSERT_EQUAL(gene4.expressionLevel, 5.0);
 }
 
 // BDD Scenario: Alignment Editing

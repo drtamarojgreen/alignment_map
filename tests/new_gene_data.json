@@ -1,0 +1,33 @@
+{
+  "genes": [
+    {
+      "gene_name": "BRCA1",
+      "knockout": false,
+      "status": "Active",
+      "expression_level": 9.2,
+      "disorderTags": ["Breast Cancer", "Ovarian Cancer"],
+      "brainRegionExpression": {
+        "Frontal Lobe": 0.4,
+        "Temporal Lobe": 0.5
+      }
+    },
+    {
+      "gene_name": "HTT",
+      "knockout": true,
+      "status": "Inactive",
+      "expression_level": 1.8,
+      "disorderTags": ["Huntington's Disease"],
+      "brainRegionExpression": {}
+    },
+    {
+      "gene_name": "APOE",
+      "knockout": false,
+      "status": "Active",
+      "expression_level": 7.5,
+      "disorderTags": [],
+      "brainRegionExpression": {
+        "Parietal Lobe": 0.9
+      }
+    }
+  ]
+}
